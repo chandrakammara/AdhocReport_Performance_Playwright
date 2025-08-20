@@ -1,0 +1,59 @@
+const { chromium } = require("playwright");
+const fs = require("fs");
+
+const REPORT_URLS = [
+  "https://stage.firstdue.com/report/result/59734",
+  "https://stage.firstdue.com/report/result/59477",
+  "https://stage.firstdue.com/report/result/59146",
+];
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  const results = [];
+
+  for (const url of REPORT_URLS) {
+    console.log(`Checking: ${url}`);
+    let timingData = null;
+
+    page.on("response", async (response) => {
+      if (response.url().includes("getResultList")) {
+        try {
+          const timing = response.request().timing();
+          // Total load time = responseEnd - startTime
+          const loadTime =
+            (timing.responseEnd - timing.startTime) / 1000; // in seconds
+          timingData = {
+            url,
+            load_time: loadTime.toFixed(2),
+          };
+        } catch (err) {
+          console.error("Error reading timing:", err);
+        }
+      }
+    });
+
+    await page.goto(url, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000); // give extra buffer for API calls
+
+    if (timingData) {
+      results.push(timingData);
+    } else {
+      results.push({ url, load_time: "N/A" });
+    }
+  }
+
+  await browser.close();
+
+  // Save results to CSV
+  const csvHeader = "url,load_time\n";
+  const csvRows = results.map((r) => `${r.url},${r.load_time}`).join("\n");
+  fs.writeFileSync(
+    `report_timings_${new Date().toISOString().split("T")[0]}.csv`,
+    csvHeader + csvRows
+  );
+
+  console.log("✅ Saved timings to CSV");
+})();
