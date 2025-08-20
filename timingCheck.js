@@ -17,7 +17,7 @@ const REPORTS = [
 ];
 
 
-//formatter function
+//Milli seconds , seconds formatter function
 function formatTime(ms) {
   if (ms < 1000) {
     return `${ms.toFixed(1)} ms`;   // under 1s → show in ms
